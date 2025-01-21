@@ -1,9 +1,11 @@
 import torch
 from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from trl import SFTTrainer, setup_chat_format
-from datasets import load_dataset
+from trl import SFTConfig, SFTTrainer, setup_chat_format
+import trl
+from datasets import load_dataset, Dataset
 import argparse
 from huggingface_hub import login
+import wandb
 
 from peft import LoraConfig
 
@@ -16,8 +18,6 @@ peft_config = LoraConfig(
         target_modules="all-linear",
         task_type="CAUSAL_LM", 
 )
-
-HF_TOKEN = "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"
 
 def get_gpu_memory():
     """Returns GPU memory usage in GB"""
@@ -34,7 +34,8 @@ if __name__ == "__main__":
     model_id = "Qwen/Qwen2.5-Coder-7B-Instruct"
     dataset = load_dataset("json", data_files=args.data_path)
 
-    login(token=HF_TOKEN)
+    # login(token=HF_TOKEN)
+    # wandb.login(key=WANDB_KEY)
 
     # Print initial GPU memory
     print(f"Initial GPU memory usage: {get_gpu_memory():.2f} GB")
@@ -59,12 +60,13 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     tokenizer.padding_side = 'right' # to prevent warnings
+    tokenizer.chat_template = None
 
     # # set chat template to OAI chatML, remove if you start from a fine-tuned model
     model, tokenizer = setup_chat_format(model, tokenizer)
 
-    args = TrainingArguments(
-        output_dir=".", # directory to save and repository id
+    args = SFTConfig(
+        # output_dir=".",                         # DONT FORGET TO SET THIS MORRON
         num_train_epochs=3,                     # number of training epochs
         per_device_train_batch_size=1,          # batch size per device during training
         gradient_accumulation_steps=8,          # number of steps before performing a backward/update pass
@@ -81,22 +83,23 @@ if __name__ == "__main__":
         warmup_ratio=0.03,
         lr_scheduler_type="constant",           # use constant learning rate scheduler
         push_to_hub=True,                       # push model to hub
-        report_to="tensorboard",                # report metrics to tensorboard
+        report_to="wandb",                # report metrics to tensorboard
+        max_seq_length=8096,                    # Qwen
+        packing=False,
+        dataset_kwargs={
+            "add_special_tokens": False,         # We template with special tokens
+            "append_concat_token": False,        # No need to add additional separator token
+        },
+        dataset_text_field="messages"
     )
-
-    max_seq_length = 2048 # max sequence length for model and packing of the dataset
+    
+    print("LEN OF DATASET: ", len(dataset))
     trainer = SFTTrainer(
         model=model,
         args=args,
-        train_dataset=dataset,
+        train_dataset=dataset["train"], # THIS FUCKING KEY DOESNT EVEN NEED TO EXIST IN YOUR DATASET !!!!
         peft_config=peft_config,
-        max_seq_length=max_seq_length,
         tokenizer=tokenizer,
-        packing=True,
-        dataset_kwargs={
-            "add_special_tokens": False,  # We template with special tokens
-            "append_concat_token": False, # No need to add additional separator token
-        }
     )
 
     # start training, the model will be automatically saved to the hub and the output directory

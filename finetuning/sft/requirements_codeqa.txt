@@ -1,0 +1,7 @@
+torch
+transformers
+trl
+datasets
+bitsandbytes
+flash-attn
+peft

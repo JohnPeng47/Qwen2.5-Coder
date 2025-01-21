@@ -3,6 +3,8 @@ from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM,
 from trl import SFTTrainer, setup_chat_format
 from datasets import load_dataset
 import argparse
+from huggingface_hub import login
+
 from peft import LoraConfig
 
 # LoRA config based on QLoRA paper & Sebastian Raschka experiment
@@ -14,6 +16,8 @@ peft_config = LoraConfig(
         target_modules="all-linear",
         task_type="CAUSAL_LM", 
 )
+
+HF_TOKEN = "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"
 
 def get_gpu_memory():
     """Returns GPU memory usage in GB"""
@@ -29,6 +33,8 @@ if __name__ == "__main__":
     
     model_id = "Qwen/Qwen2.5-Coder-7B-Instruct"
     dataset = load_dataset("json", data_files=args.data_path)
+
+    login(token=HF_TOKEN)
 
     # Print initial GPU memory
     print(f"Initial GPU memory usage: {get_gpu_memory():.2f} GB")

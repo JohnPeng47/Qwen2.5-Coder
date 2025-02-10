@@ -66,7 +66,7 @@ if __name__ == "__main__":
     model, tokenizer = setup_chat_format(model, tokenizer)
 
     args = SFTConfig(
-        # output_dir=".",                         # DONT FORGET TO SET THIS MORRON
+        # output_dir=".",                       # DONT FORGET TO SET THIS MORRON
         num_train_epochs=3,                     # number of training epochs
         per_device_train_batch_size=1,          # batch size per device during training
         gradient_accumulation_steps=8,          # number of steps before performing a backward/update pass

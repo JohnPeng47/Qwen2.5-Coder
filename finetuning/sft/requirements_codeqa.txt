@@ -5,3 +5,5 @@ datasets
 bitsandbytes
 flash-attn
 peft
+wandb
+huggingface-hub

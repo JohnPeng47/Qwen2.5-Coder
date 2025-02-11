@@ -6,9 +6,13 @@ import sys
 import os
 import random
 from datasets import load_dataset, Dataset
+import functools
 
-MIX_DATASET = "HuggingFaceFW/fineweb-edu"
-MIX_RATIO = 10              # suggested by Teor
+
+# MIX_DATASET = "HuggingFaceFW/fineweb-edu"
+MIX_DATASET = "yahma/alpaca-cleaned"
+MIX_RATIO = 10 # suggested by Teor
+
 
 def load_dataset_by_size(
     dataset_name: str,
@@ -66,8 +70,13 @@ def load_dataset_by_size(
     print(f"Requested size: {target_size_bytes:,} bytes")
     print(f"Actual size: {actual_size:,} bytes")
     print(f"Number of items: {target_items:,}")
-    
-    return final_dataset
+
+    return functools.reduce(lambda x,y: x + y, [
+        [
+            {"role": "user", "content": item["instruction"]},
+            {"role": "assistant", "content": item["output"]}
+        ] for item in final_dataset
+    ])
 
 def create_conversation_pair(question, code_content):
     """Create a single Q&A pair with code context"""
@@ -83,21 +92,26 @@ def create_training_data(sample):
     """Convert sample into training conversations"""
     instruct_ft_data = []
     code_size = 0
+    chat_num = 0
     for code_block in sample["code_blocks"]:
         for question in code_block["questions"]:
             conversation = create_conversation_pair(
                 question=question,
                 code_content=code_block["content"]
             )
+            chat_num += 1
             instruct_ft_data.extend(conversation)
 
         code_size += len(code_block["content"])
     
     instruct_ft_data += load_dataset_by_size(MIX_DATASET, code_size * MIX_RATIO)
+
+    print("Total number of code instruct:", chat_num)
     return instruct_ft_data
 
 if __name__ == "__main__":
     # Check that current working directory ends with finetuning/sft
+
     cwd = Path.cwd()
     if not str(cwd).endswith(f"finetuning{os.sep}sft"):
         raise ValueError("Script must be run from finetuning/sft directory")

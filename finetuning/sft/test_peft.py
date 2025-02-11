@@ -1,5 +1,7 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import PeftModel
+from transformers import AutoTokenizer, BitsAndBytesConfig
+from peft import PeftModel, AutoPeftModelForCausalLM
+
+ADAPTER_WEIGHTS = "/workspace/peft-codeqa-Qwen2.5-7b-6-epochs"
 
 # Optional: Configure 4-bit quantization for efficient loading
 bnb_config = BitsAndBytesConfig(
@@ -10,22 +12,19 @@ bnb_config = BitsAndBytesConfig(
 )
 
 # Load base model with quantization
-base_model = AutoModelForCausalLM.from_pretrained(
-    "Qwen/Qwen2.5-Coder-7B-Instruct",
-    device_map="auto",
-    quantization_config=bnb_config,
+tokenizer = AutoTokenizer.from_pretrained(
+    "Qwen/Qwen2.5-Coder-7B-Instruct", 
     trust_remote_code=True
 )
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-Coder-7B-Instruct", trust_remote_code=True)
 
 # Load your LoRA adapter
-model = PeftModel.from_pretrained(
-    base_model,
-    "your-username/your-model-name",  # Your HF repo name
+model = AutoPeftModelForCausalLM.from_pretrained(
+    ADAPTER_WEIGHTS,
+    device_map="auto"
 )
 
 # Example inference
-prompt = "Your prompt here"
+prompt = "What does repo_map.py file do in Aider?"
 inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 outputs = model.generate(**inputs, max_length=200)
 response = tokenizer.decode(outputs[0], skip_special_tokens=True)

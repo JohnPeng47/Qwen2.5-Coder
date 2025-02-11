@@ -3,7 +3,9 @@ transformers
 trl
 datasets
 bitsandbytes
-flash-attn
+flash-attn==2.3.6
 peft
 wandb
 huggingface-hub
+python-dotenv
+peft==0.7.0

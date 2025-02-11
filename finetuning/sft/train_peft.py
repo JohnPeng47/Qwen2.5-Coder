@@ -1,22 +1,36 @@
 import torch
 from transformers import TrainingArguments, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer, setup_chat_format
-import trl
 from datasets import load_dataset, Dataset
 import argparse
 from huggingface_hub import login
 import wandb
+import sys
 
 from peft import LoraConfig
 
+model_id = "Qwen/Qwen2.5-Coder-7B-Instruct"
+# model_id = "Qwen/Qwen2.5-7B-Instruct"
+
 # LoRA config based on QLoRA paper & Sebastian Raschka experiment
 peft_config = LoraConfig(
-        lora_alpha=128,
-        lora_dropout=0.05,
-        r=256,
-        bias="none",
-        target_modules="all-linear",
-        task_type="CAUSAL_LM", 
+    lora_alpha=128,
+    lora_dropout=0.05,
+    r=256,
+    bias="none",
+    target_modules=[
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+        "w1",
+        "w2",
+        "w3",
+    ],
+    task_type="CAUSAL_LM",
 )
 
 def get_gpu_memory():
@@ -28,14 +42,15 @@ def get_gpu_memory():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate code QA pairs from a repository")
     parser.add_argument("data_path", type=str, help="Path to the repository to analyze")
+    parser.add_argument("outdir", type=str, help="Path to the repository to analyze")
+
 
     args = parser.parse_args()
     
-    model_id = "Qwen/Qwen2.5-Coder-7B-Instruct"
     dataset = load_dataset("json", data_files=args.data_path)
 
-    # login(token=HF_TOKEN)
-    # wandb.login(key=WANDB_KEY)
+    login(token="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")
+    wandb.login(key="148456856cab0b185e3c509505a2e9e7b2d57780")
 
     # Print initial GPU memory
     print(f"Initial GPU memory usage: {get_gpu_memory():.2f} GB")
@@ -58,7 +73,10 @@ if __name__ == "__main__":
     print(f"GPU memory after loading model: {get_gpu_memory():.2f} GB")
     print(f"Total GPU memory used: {get_gpu_memory():.2f} GB")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True
+    )
     tokenizer.padding_side = 'right' # to prevent warnings
     tokenizer.chat_template = None
 
@@ -66,8 +84,8 @@ if __name__ == "__main__":
     model, tokenizer = setup_chat_format(model, tokenizer)
 
     args = SFTConfig(
-        # output_dir=".",                       # DONT FORGET TO SET THIS MORRON
-        num_train_epochs=3,                     # number of training epochs
+        output_dir=args.outdir,                 # DONT FORGET TO SET THIS MORRON
+        num_train_epochs=4,                     # number of training epochs
         per_device_train_batch_size=1,          # batch size per device during training
         gradient_accumulation_steps=8,          # number of steps before performing a backward/update pass
         gradient_checkpointing=True,            # use gradient checkpointing to save memory
@@ -87,8 +105,8 @@ if __name__ == "__main__":
         max_seq_length=8096,                    # Qwen
         packing=False,
         dataset_kwargs={
-            "add_special_tokens": False,         # We template with special tokens
-            "append_concat_token": False,        # No need to add additional separator token
+            "add_special_tokens": False,        
+            "append_concat_token": False,       
         },
         dataset_text_field="messages"
     )

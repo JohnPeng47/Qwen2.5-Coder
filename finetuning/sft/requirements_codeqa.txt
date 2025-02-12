@@ -3,7 +3,6 @@ transformers
 trl
 datasets
 bitsandbytes
-flash-attn==2.3.6
 peft
 wandb
 huggingface-hub

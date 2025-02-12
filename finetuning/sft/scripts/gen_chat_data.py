@@ -71,6 +71,10 @@ def load_dataset_by_size(
     print(f"Actual size: {actual_size:,} bytes")
     print(f"Number of items: {target_items:,}")
 
+    for item in list(final_dataset)[:15]:
+        print("Q: ", item["instruction"])
+        # print("A: ", item["output"])
+
     return functools.reduce(lambda x,y: x + y, [
         [
             {"role": "user", "content": item["instruction"]},

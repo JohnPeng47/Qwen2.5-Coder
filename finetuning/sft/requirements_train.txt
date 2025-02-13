@@ -8,4 +8,4 @@ wandb
 huggingface-hub
 python-dotenv
 peft==0.7.0
-vllm
+flash-attn

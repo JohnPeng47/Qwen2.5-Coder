@@ -71,16 +71,12 @@ def load_dataset_by_size(
     print(f"Actual size: {actual_size:,} bytes")
     print(f"Number of items: {target_items:,}")
 
-    for item in list(final_dataset)[:15]:
-        print("Q: ", item["instruction"])
-        # print("A: ", item["output"])
-
-    return functools.reduce(lambda x,y: x + y, [
+    return  [
         [
             {"role": "user", "content": item["instruction"]},
             {"role": "assistant", "content": item["output"]}
         ] for item in final_dataset
-    ])
+    ]
 
 def create_conversation_pair(question, code_content):
     """Create a single Q&A pair with code context"""
@@ -104,7 +100,7 @@ def create_training_data(sample):
                 code_content=code_block["content"]
             )
             chat_num += 1
-            instruct_ft_data.extend(conversation)
+            instruct_ft_data.append(conversation)
 
         code_size += len(code_block["content"])
     
@@ -135,10 +131,10 @@ if __name__ == "__main__":
 
     # Convert to ChatML format
     conversations = create_training_data(qa_data)
-    conversations = {
-        "messages": conversations
-    }
-
+    conversations = [
+        {"messages": conv} for conv in conversations
+    ]
+    
     outfile = outdir / f"{data_path.stem}_train.json"
     with open(outfile, "w") as f:
         f.write(json.dumps(conversations))

@@ -1,77 +1,55 @@
 #!/usr/bin/env python3
-from vllm.entrypoints.openai import api_server
-from vllm import LLM, SamplingParams
 from peft import AutoPeftModelForCausalLM
 from transformers import AutoTokenizer
 import argparse
 import os
 import torch
-import uvloop
-from vllm.entrypoints.openai.api_server import run_server
 
-
-# Static paths
-STATIC_MODEL_DIR = os.path.expanduser("~/aider_models")  # Use home directory
-MERGED_MODEL_PATH = os.path.join(STATIC_MODEL_DIR, "merged_model")
-
-def ensure_model_merged():
-    """Ensure we have a merged model available"""
-    if os.path.exists(MERGED_MODEL_PATH):
-        print(f"Found existing merged model at {MERGED_MODEL_PATH}")
-        return MERGED_MODEL_PATH
+def merge_peft_model(model_name: str, output_dir: str):
+    """Download and merge a PEFT model with its base model
     
-    print(f"No merged model found. Merging PEFT model...")
-    os.makedirs(STATIC_MODEL_DIR, exist_ok=True)
+    Args:
+        model_name: Name/path of the PEFT model
+        output_dir: Directory to save the merged model
+    """
+    print(f"Creating output directory: {output_dir}")
+    os.makedirs(output_dir, exist_ok=True)
     
-    # Load and merge model
+    print(f"Loading PEFT model from {model_name}...")
     model = AutoPeftModelForCausalLM.from_pretrained(
-        "JonhTheTrueKingoftheNorth/SingleRepo_Aider",
-        device_map="cuda"  # Load on CPU first
+        model_name,
+        device_map="cuda" if torch.cuda.is_available() else "cpu"
     )
     
-    tokenizer = AutoTokenizer.from_pretrained("JonhTheTrueKingoftheNorth/SingleRepo_Aider")
-    tokenizer.save_pretrained(MERGED_MODEL_PATH)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.save_pretrained(output_dir)
 
     print("Merging adapter with base model...")
     merged_model = model.merge_and_unload()
     
-    print(f"Saving merged model to {MERGED_MODEL_PATH}")
-    merged_model.save_pretrained(MERGED_MODEL_PATH)
+    print(f"Saving merged model to {output_dir}")
+    merged_model.save_pretrained(output_dir)
     
-    # Clear CUDA cache
+    # Clear CUDA cache if GPU was used
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    
-    return MERGED_MODEL_PATH
 
 def main():
-    parser = argparse.ArgumentParser(description='Start VLLM server with merged PEFT model')
-    parser.add_argument('--port', type=int, default=8000, help='Port to run server on')
-    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run server on')
-    parser.add_argument('--tensor-parallel-size', type=int, default=1, help='Number of GPUs to use')
-    parser.add_argument('--force-merge', action='store_true', help='Force remerge model even if it exists')
+    parser = argparse.ArgumentParser(description="Download and merge PEFT model")
+    parser.add_argument("--model-name", type=str, required=True, 
+                       help="Name or path of the PEFT model")
+    parser.add_argument("--output-dir", type=str, required=True, default="peft_model",
+                       help="Directory to save the merged model")
+    parser.add_argument("--force", action="store_true",
+                       help="Force remerge model even if output directory exists")
     args = parser.parse_args()
 
-    # Remove existing merged model if force-merge is specified
-    if args.force_merge and os.path.exists(MERGED_MODEL_PATH):
+    if args.force and os.path.exists(args.output_dir):
         print("Force merge requested. Removing existing merged model...")
         import shutil
-        shutil.rmtree(MERGED_MODEL_PATH)
+        shutil.rmtree(args.output_dir)
 
-    # Ensure we have a merged model
-    model_path = ensure_model_merged()
-    
-    print(f"Initializing VLLM with model from {model_path}")
-    llm = LLM(
-        model=model_path,
-        tensor_parallel_size=args.tensor_parallel_size,
-        trust_remote_code=True  # Needed for Qwen models
-    )
-
-    print(f"Starting server on {args.host}:{args.port}")
-
-    args.model = model_path
-    uvloop.run(run_server(args))
+    merge_peft_model(args.model_name, args.output_dir)
 
 if __name__ == "__main__":
     main()

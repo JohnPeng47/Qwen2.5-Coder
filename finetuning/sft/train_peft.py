@@ -121,7 +121,9 @@ if __name__ == "__main__":
     )
 
     # start training, the model will be automatically saved to the hub and the output directory
-    trainer.train()
+    trainer.train(
+        resume_from_checkpoint=True
+    )
 
     # save model 
     trainer.save_model()
